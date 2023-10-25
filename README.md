@@ -3,8 +3,8 @@ Welcome to the Cluster Analysis Techniques Exploration repository! Here, we emba
 
 # Key Features:
 
-# K-Means Clustering:
+## K-Means Clustering:
 Dive into one of the most widely used clustering techniques, understanding how it partitions data into distinct clusters based on similarity.
 
-# Hierarchical Clustering:
+## Hierarchical Clustering:
 Explore the hierarchical approach to clustering, where data points are successively grouped into clusters, forming a tree-like structure.
