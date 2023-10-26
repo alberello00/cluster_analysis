@@ -1,0 +1,296 @@
+---
+title: "K-Means"
+output: github_document
+latex_engine : xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+K-means is a popular unsupervised machine learning algorithm used for clustering data. It aims to partition a dataset into K distinct, non-overlapping subgroups or clusters. The "K" in K-means represents the number of clusters the algorithm should create.
+The algorithm works by iteratively assigning data points to clusters based on the mean of the feature values, and then recalculating the centroids (mean points) of each cluster. This process is repeated until convergence, which occurs when the assignments no longer change significantly.
+
+Let $D = {x_1, x_2, ..., x_n}$  where $X_i = (x_{i1}, ..., x_{ip})' \in \mathbb{R}^{p}$ with $ i \in N_n = {1, ..., n}$ is the vector of the observation per variable
+Here, in the code below we can see an example: I took the olive oil dataset, which is provided in the section Dataset of the folder.
+```{r}
+oliveoil <- read.csv("/Users/albertotrashaj/Desktop/Università/Unsupervised/oliveoil.dat", sep="") #substitute the path with the actual path of your directory
+str(oliveoil)
+summary(oliveoil)
+```
+We can see that we have a dataframe of 572 observations of 10 variables: some of the variables are variable of chr type, and the other ones are all integers type. 
+Since we are trying to work with numbers, we should deal with the character variables.
+ 
+In particular, the macro.area and the region can be converted to factors, a special data type that assign a level to every different character that we have in the variable. 
+```{r}
+data <- oliveoil #change the name just for comfort
+data$macro.area <- factor(data$macro.area)
+data$region <- factor(data$region)
+str(data)
+```
+By looking to the structure of the dataset now we can see that the macro.area has three levels, and the region nine. 
+The deep reason that lead us to operate so should be discussed in another space, since here we want to focus in the K-means algorithm.
+In the next scripts we will see more about different data types.
+
+Now that the dataframe is ready to be clustered we can call the main library that we are going to use: cluster library.
+The dplyr library is used to concatenate operations on the dataframe.
+```{r}
+library(cluster)
+library(dplyr)
+```
+
+
+```{r}
+set.seed(123)
+
+results_unscaled <- list()
+results_scaled <- list()
+scaled <- data %>%
+    select(-macro.area, -region)
+
+df.unscaled <- scaled
+df.scaled <- scale(scaled)
+
+k_values <- c(3,9) 
+
+wss_unscaled <- numeric(length(k_values))
+wss_scaled <- numeric(length(k_values))
+
+for (k in k_values){
+    k_means_unscaled <- kmeans(df.unscaled, centers = k)
+    results_unscaled[[as.character(k)]] <- k_means_unscaled$cluster
+  
+    kmeans_scaled <- kmeans(df.scaled, centers = k)
+    results_scaled[[as.character(k)]] <- kmeans_scaled$cluster
+  
+    cat("For K =", k, ":\n")
+  
+    cat("Unscaled Data WSS:", k_means_unscaled$tot.withinss, "\n")
+    cat("Scaled Data WSS:", kmeans_scaled$tot.withinss, "\n")
+  
+  
+     cat("Unscaled Data (Macro Areas):\n")
+     print(table(results_unscaled[[as.character(k)]], data$macro.area))
+     cat("Scaled Data (Macro Areas):\n")
+     print(table(results_scaled[[as.character(k)]], data$macro.area))
+     cat("Unscaled Data (Regions):\n")
+     print(table(results_unscaled[[as.character(k)]], data$region))
+     cat("Scaled Data (Regions):\n")
+     print(table(results_scaled[[as.character(k)]], data$region))
+}
+```
+
+
+
+
+```{r}
+Boston <- read.csv("/Users/albertotrashaj/Desktop/Università/Unsupervised/Boston.dat", sep="")
+str(Boston)
+summary(Boston)
+cor(Boston)
+attach(Boston)
+```
+
+```{r}
+names <- colnames(Boston)
+out <- list()
+for (i in names){
+    number <- n_distinct(Boston[i])
+    if (number < 30)
+     out <- append(out, i)
+}
+out
+```
+```{r}
+reduced_df <- Boston %>%
+        select(-zn, -chas, -rad)
+reduced_df
+```
+```{r}
+pairs_boston <- pairs(Boston)
+pairs_reduced_boston <- pairs(reduced_df)
+heatmap_boston <- heatmap(as.matrix(Boston))
+heatmap_reduced_boston <- heatmap(as.matrix(reduced_df))
+```
+
+```{r}
+set.seed(1234)
+k <- c(3,5,7,9,11,13,15)
+
+reduced_df <- scale(reduced_df)
+
+for (i in k){
+    k_means <- kmeans(reduced_df, centers = i)
+    print(k_means)
+}
+```
+```{r}
+dist_matrix <- dist(reduced_df)
+
+hc <- hclust(dist_matrix, method = "complete") 
+
+plot(hc)
+```
+
+```{r}
+clusters_hc <- cutree(hc, k = 15)  # Hierarchical clustering
+clusters_kmeans <- k_means$cluster  # K-means clustering
+
+table(clusters_hc, clusters_kmeans)
+
+```
+```{r}
+library(pracma)
+    kmpp <- function(X, k) {
+     n <- nrow(X)
+     C <- numeric(k)
+     C[1] <- sample(1:n, 1)
+    for (i in 2:k) {
+      dm <- distmat(X, X[C, ])
+      pr <- apply(dm, 1, min); 
+      pr[C] <- 0
+      C[i] <- sample(1:n, 1, prob = pr)
+      }
+    kmeans(X, X[C, ])
+    }
+
+    c_1800 <- read.csv("~/Desktop/Università/Unsupervised/Stars/c_1800.csv")
+    c_1800_matrix <- as.matrix(c_1800)
+
+    bundestag <- read.csv("~/Desktop/Università/Unsupervised/bundestag.dat", sep="")
+    bundestag.matrix <- as.matrix(bundestag)
+
+
+    k <- 5
+
+    kmpp_stars <- kmpp(c_1800_matrix, k)
+    kmeans_star_first <- kmeans(c_1800_matrix, k, nstart=1)
+    kmeans_star_hundred <- kmeans(c_1800_matrix, k, nstart = 100)
+
+    cat("kmpp_stars withinss:", kmpp_stars$tot.withinss, "\n")
+    cat("kmeans_star_first withinss:", kmeans_star_first$tot.withinss, "\n")
+    cat("kmeans_star_hundred withinss:", kmeans_star_hundred$tot.withinss, "\n")
+
+
+
+    bundestag_num <- bundestag %>%
+     select(-state, -ewb)
+
+    bundestag.matrix <- as.matrix(bundestag_num)
+
+    bundestag_kmpp <- kmpp(bundestag.matrix, k)
+    bundestag_kmeans_first <- kmeans(bundestag.matrix, k , nstart=1)
+    bundestag_kmeans_hundred <- kmeans(bundestag.matrix, k , nstart=100)
+
+
+
+    cat("bundestag_kmpp:", bundestag_kmpp$tot.withinss, "\n")
+    cat("bundestag_kmeans_first:", bundestag_kmeans_first$tot.withinss, "\n")
+    cat("bundestag_kmeans_hundred:", bundestag_kmeans_hundred$tot.withinss, "\n")
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
