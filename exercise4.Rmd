@@ -1,0 +1,358 @@
+---
+title: "exercise4"
+output: html_document
+date: "2023-10-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Here we import the library and the dataset used: the Tetragounal dataset gives genetic data for 236 bees from Australia and Southeast Asia. 
+
+```{r}
+library(cluster)
+library(prabclus)
+library(smacof)
+library(fpc)
+library(rgl)
+```
+
+```{r}
+data(tetragonula)
+```
+
+Now, by using function implemented in the prablcus library we convert the genetic data in a proper way.
+
+```{r}
+ta <- alleleconvert(strmatrix=tetragonula)
+tai <- alleleinit(allelematrix=ta)
+distmatrix <- as.dist(tai$distmat)
+```
+
+#MDS plot
+
+Let's see the MDS plot of the distance matrix previously computed.
+```{r}
+plot(mds(distmatrix))
+```
+
+From this plot is still not clear the clustering structure present in the dataset.
+
+#Hierarchical clustering.
+
+Let's apply the hiearachical clustering procedures with single, average and complete methods.
+
+```{r}
+method <- c("single", "average", "complete")
+
+for (i in method){
+  result_cluster <- hclust(distmatrix ,method = i)
+  plot(result_cluster)
+}
+```
+
+From those plot is not clear which is the best method among those.
+
+
+Now let's try to find the optimal number of clusters using the Silhouette Average Width
+
+#### Silhouette scores
+
+# Silhouette for the average method
+```{r}
+asw_average <- NA
+average_clusk <- list()
+average_sil <- list()
+
+# Look at K between 2 and 30:
+for (k in 2:30){
+# Hierarchical-average clustering:
+  average_clusk[[k]] <- cutree(hclust(distmatrix, method = "average"), k = k)
+  
+# Computation of silhouettes:
+  average_sil[[k]] <- silhouette(average_clusk[[k]],dist=distmatrix)
+  
+# ASW needs to be extracted:
+  asw_average[k] <- summary(average_sil[[k]])$avg.width
+  
+}
+# Plot the ASW-values against K:
+plot(1:30,asw_average,type="l",xlab="Number of opt. clusters with average method",ylab="ASW")
+plot(average_sil[[which.max(asw_average)]])
+
+```
+
+# Silhouette for the complete method
+```{r}
+complete_asw <- NA
+complete_clusk <- list()
+complete_sil <- list()
+
+# Look at K between 2 and 30:
+for (k in 2:30){
+# Hierarchical- complete clustering:
+  complete_clusk[[k]] <- cutree(hclust(distmatrix, method = "complete"), k = k)
+  
+# Computation of silhouettes:
+  complete_sil[[k]] <- silhouette(complete_clusk[[k]],dist=distmatrix)
+  
+# ASW needs to be extracted:
+  complete_asw[k] <- summary(complete_sil[[k]])$avg.width
+  
+}
+# Plot the ASW-values against K:
+plot(1:30,complete_asw,type="l",xlab="Number of opt. clusters with complete method",ylab="ASW")
+plot(complete_sil[[which.max(complete_asw)]])
+```
+# Silhouette single
+```{r}
+single_asw <- NA
+single_clusk <- list()
+single_sil <- list()
+
+# Look at K between 2 and 30:
+for (k in 2:30){
+# Hierarchical-single clustering:
+  single_clusk[[k]] <- cutree(hclust(distmatrix, method = "single"), k = k)
+  
+# Computation of silhouettes:
+  single_sil[[k]] <- silhouette(single_clusk[[k]],dist=distmatrix)
+  
+# ASW needs to be extracted:
+  single_asw[k] <- summary(single_sil[[k]])$avg.width
+  
+}
+# Plot the ASW-values against K:
+plot(1:30,single_asw,type="l",xlab="Number of opt. clusters with single method",ylab="ASW")
+
+plot(single_sil[[which.max(single_asw)]])
+```
+## The optimal number of clusters when we compute the average and complete method is a number between 10 and 12. 
+
+Let's visualize the clustering in a mds plot and then decide by a visual inspection which will be the optimal number of cluster.
+
+#Complete method, visual inspection of the mds plot when the optimal number of clusters is 10, 11 and 12.
+```{r}
+for (i in 10:12){
+  complete_cut <- cutree(hclust(distmatrix, method = "complete"), k = i)
+  plot(mds(distmatrix)$conf, col = complete_cut, pch = clusym[complete_cut])
+}
+```
+Let's do the same thing for the average method.
+```{r}
+for (i in 10:12){
+  average_cut <- cutree(hclust(distmatrix, method = "average"), k = i)
+  plot(mds(distmatrix)$conf, col = average_cut, pch = clusym[average_cut])
+}
+
+```
+The result are pretty similar, the optimal number of clusters is some number between 10 and 12. If we rely to the silhouette I would say that 10 is the optimal number of cluster.
+Although, the mds plot maybe in this situation is not the best tool to check wheteher our clustering is good: we see some overlapping region and this might due to the fact that the mds lose information present in the original dataset.
+
+
+
+
+#### Point b
+In the second point we approach the problem in a different way: we generate an MDS and from the points generated we apply some different clustering techniques.
+
+Let's take the points generated from a mds on two dimension.
+```{r}
+library(smacof)
+point_mds<- mds(distmatrix, ndim=2)$conf
+summary(point_mds)
+```
+
+# K-means
+Let's apply the k-means algorithm to the dataset for different number of clusters
+
+```{r}
+library(fpc)
+for (i in 2:15){
+  mds_kmeans <- kmeans(point_mds, centers = i, iter.max = 100)
+  summary(mds_kmeans)
+  plot(point_mds,col=mds_kmeans$cluster,pch=clusym[mds_kmeans$cluster])
+}
+
+```
+From a visual inspection we can see that when we have more than 10 clusters the point starts to overlap.
+
+
+# Ward method
+```{r}
+clust_ward <- (hclust(distmatrix, method ="ward.D2"))
+plot(clust_ward)
+
+for (i in 2:15){
+  ward_cut <- cutree(clust_ward, k = i)
+  plot(point_mds, col = ward_cut, pch = clusym[ward_cut], )
+}
+```
+Again, it's difficult to determine the optimal number of clusters, since there are some overlapping regions in almost every plot.
+
+
+# Gaussian mixture
+```{r}
+mds_gaus_mixt <- Mclust(point_mds,G = 1:20)
+summary(mds_gaus_mixt)
+plot(mds_gaus_mixt)
+```
+---------------------------------------------------- 
+Gaussian finite mixture model fitted by EM algorithm 
+---------------------------------------------------- 
+
+Mclust VVE (ellipsoidal, equal orientation) model with 7 components: 
+
+
+Clustering table:
+ 1  2  3  4  5  6  7 
+35 23 16 20 15 63 64 
+
+
+Here we fitted a Gaussian mixture model to the mds points: the optimal mixture model estimation is VVE(ellipsoidal, equal orientation) with 7 components.
+
+
+The nature of the problem involves the identification of bee species, aiming to discern various bee families. Despite a limited understanding of genomics, hierarchical clustering is suggested as a powerful tool. This method allows for the observation of similar traits gradually forming clusters, aiding in the grouping of families with shared characteristics.
+
+If the bee species exhibit a more complex structure, yeilding irregular groupings, a non-hierarchical clustering could be a better tool.
+
+Let's check whether to produce an MDS solution with more than two dimension could help to achieve to better results: higher dimensional spaces can capture more information but can also be more complex and harder to interpret.
+
+## 3 dimension 
+
+With the "rgl" library we can use the function $3dplot$ to see some visualization.
+
+```{r}
+
+tre_dim_mds <- mds(distmatrix, n = 3)$conf
+
+x <- c(tre_dim_mds[,1])
+y <- c(tre_dim_mds[,2])
+z <- c(tre_dim_mds[,3])
+
+point_mds_3d <- data.frame(x,y,z)
+```
+
+
+```{r}
+mds_kmeans_3d <- kmeans(point_mds_3d, centers = 4)
+plot3d(point_mds_3d, col=mds_kmeans_3d$cluster, type="s", size=3)
+```
+
+
+
+```{r}
+mds_gaus_mixt_3d <- Mclust(point_mds_3d,G = 1:20)
+summary(mds_gaus_mixt_3d)
+plot(mds_gaus_mixt)
+```
+
+---------------------------------------------------- 
+Gaussian finite mixture model fitted by EM algorithm 
+---------------------------------------------------- 
+
+Mclust VEV (ellipsoidal, equal shape) model with 8 components: 
+
+
+Clustering table:
+ 1  2  3  4  5  6  7  8 
+35 23 27 16 12 61 48 14 
+
+
+With the 3-dimension mds, the optimal number of mixture components is 8 with VEV type. 
+
+
+
+```{r}
+pca_mixt_3d <- princomp(scale(point_mds_3d))
+
+plot3d(pca_mixt_3d$scores,col=mds_gaus_mixt_3d$classification,
+      pch=clusym[mds_gaus_mixt_3d$classification],
+      type = "s",
+      size = 2)
+```
+
+
+
+
+
+
+# Point 2
+
+
+```{r}
+wdbc <- read.csv("~/Desktop/Università/Unsupervised/wdbc.data", header=FALSE)
+```
+
+```{r}
+wdbcc <- scale(wdbc[,3:12])
+wdbcdiag <- as.factor(wdbc[,2])
+```
+
+
+```{r}
+a <- kmeans(wdbcc, centers = 3)
+plot(wdbcc,
+     col=a$cluster,
+     pch=clusym[a$cluster],
+    )
+```
+
+```{r}
+dist_breas <-dist(wdbcc, method = "euclidean")
+mds_breast <- mds(dist_breas, ndim = 3)
+
+x1 <- mds_breast$conf[,1]
+x2 <- mds_breast$conf[,2]
+x3 <- mds_breast$conf[,3]
+
+mds_breast_dataframe <- data.frame(x1, x2, x3)
+
+plot3d(mds_breast_dataframe,
+       type = "s",
+       size = 2,
+       )
+
+```
+
+
+## Gaussian mixture model breast cancer
+```{r}
+
+wdbcc_gaus_mixt <- Mclust(wdbcc,G = 1:20)
+summary(wdbcc_gaus_mixt)
+
+```
+
+
+```{r}
+plot(wdbcc_gaus_mixt)
+```
+### which is better k-means or hierarchical? Probably, since the problem is to find different species based on similarity genes, I would use Hierarchical since you can see all the developement of the genes, so you can find familiy, races, species, ecc...
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
